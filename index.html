@@ -3,20 +3,127 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>aitest1 在线预览</title>
+  <title>AITEST1 Router Hotfix</title>
   <style>
-    body { font-family: Arial, sans-serif; background:#f6f8fa; margin:0; display:grid; place-items:center; min-height:100vh; }
-    .card { background:#fff; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.08); padding:24px; width:min(92vw,640px); }
-    code { background:#f3f4f6; padding:2px 6px; border-radius:6px; }
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; margin:0; background:#f5f7fb; }
+    .wrap { max-width: 460px; margin: 60px auto; background:#fff; border-radius:14px; padding:24px; box-shadow:0 8px 24px rgba(0,0,0,.08); }
+    h1 { margin:0 0 16px; font-size:22px; }
+    input { width:100%; margin:8px 0; padding:10px; border:1px solid #d0d7de; border-radius:8px; box-sizing:border-box; }
+    button { padding:10px 14px; border:none; border-radius:8px; background:#2f81f7; color:#fff; font-weight:600; cursor:pointer; }
+    .line { margin-top: 12px; color:#57606a; font-size:13px; }
+    .ok { color:#1a7f37; }
+    .bad { color:#d1242f; }
+    .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+    code { background:#eef2ff; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>aitest1 在线预览页</h2>
-    <p>仓库已整理为可 Docker Compose 一键启动的前后端结构。</p>
-    <p>本页为 GitHub Pages 静态预览。完整功能请在本地执行：</p>
-    <pre><code>docker compose up -d --build</code></pre>
-    <p>启动后访问 <code>http://localhost:8080</code>。</p>
-  </div>
+  <div class="wrap" id="app"></div>
+
+  <script>
+    const BASENAME = '/aitest1';
+
+    function normalizePath(pathname) {
+      if (pathname.startsWith(BASENAME)) {
+        const p = pathname.slice(BASENAME.length);
+        return p || '/';
+      }
+      return pathname || '/';
+    }
+
+    function withBase(path) {
+      return `${BASENAME}${path === '/' ? '' : path}`;
+    }
+
+    function isAuthed() {
+      return localStorage.getItem('auth_token') === 'ok';
+    }
+
+    function login() {
+      localStorage.setItem('auth_token', 'ok');
+    }
+
+    function logout() {
+      localStorage.removeItem('auth_token');
+      navigate('/login');
+    }
+
+    function navigate(path, replace = false) {
+      const url = withBase(path);
+      if (replace) history.replaceState({}, '', url);
+      else history.pushState({}, '', url);
+      render();
+    }
+
+    function getRoute() {
+      const from404 = new URLSearchParams(location.search).get('p');
+      if (from404) {
+        history.replaceState({}, '', withBase(from404));
+      }
+      return normalizePath(location.pathname);
+    }
+
+    function renderLogin(redirect) {
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <h1>登录页（hotfix）</h1>
+        <input id="u" value="admin" placeholder="用户名" />
+        <input id="p" type="password" value="123456" placeholder="密码" />
+        <button id="btn">登录</button>
+        <div class="line">默认演示账号：admin / 123456</div>
+        <div class="line">当前地址：<code>${location.pathname}</code></div>
+      `;
+      document.getElementById('btn').onclick = () => {
+        login();
+        navigate(redirect || '/admin/dashboard');
+      };
+    }
+
+    function renderDashboard() {
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <div class="top"><h1>Admin Dashboard</h1><button id="logout">退出登录</button></div>
+        <div class="line ok">已登录，路由命中：<code>/admin/dashboard</code></div>
+        <div class="line">当前地址栏：<code>${location.pathname}</code></div>
+      `;
+      document.getElementById('logout').onclick = logout;
+    }
+
+    function render404(path) {
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <h1>404</h1>
+        <div class="line bad">未匹配路由：<code>${path}</code></div>
+        <div class="line"><button id="go">返回登录</button></div>
+      `;
+      document.getElementById('go').onclick = () => navigate('/login');
+    }
+
+    function render() {
+      const path = getRoute();
+      if (path.startsWith('/admin')) {
+        if (!isAuthed()) {
+          navigate(`/login?redirect=${encodeURIComponent(path)}`, true);
+          return;
+        }
+      }
+
+      if (path === '/' || path.startsWith('/login')) {
+        const q = new URLSearchParams(location.search);
+        renderLogin(q.get('redirect'));
+        return;
+      }
+
+      if (path === '/admin/dashboard') {
+        renderDashboard();
+        return;
+      }
+
+      render404(path);
+    }
+
+    window.addEventListener('popstate', render);
+    render();
+  </script>
 </body>
 </html>
